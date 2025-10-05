@@ -1,0 +1,46 @@
+%% Mermaid diagrams for Phoenix & Watcho
+%% You can paste these into GitHub Markdown or render to PNG via Mermaid CLI.
+
+%% Context
+flowchart LR
+  Normal[Normal User] --> WebUI
+  Corp[Corporate User] --> WebUI
+  WebUI[React 18 SPA] --> API[.NET Core 9 Web + REST API]
+  API --> SQL[(SQL Server 2021)]
+  API --> Blob[(Azure Blob Storage)]
+  API --> Bitly[(Bitly API)]
+  API <--> Dish[DishTV Platform]
+  API <--> D2H[D2H Platform]
+  API -.-> Jobs[Background Jobs]
+  Dev[TFS Pipelines] --> API
+
+%% Package Change Sequence
+sequenceDiagram
+  participant UI as React UI
+  participant API as .NET API
+  participant DB as SQL
+  participant P as DishTV/D2H
+  UI->>API: POST /subscriber/{id}/package-change
+  API->>DB: Load current plan & rules
+  API->>API: Validate eligibility & conflicts
+  API->>P: Apply plan update (partner adapter)
+  P-->>API: Confirmation + billing delta
+  API->>DB: Persist history + audit
+  API-->>UI: 200 OK + new plan
+
+%% Lead to Payment Sequence
+sequenceDiagram
+  participant UI as React UI
+  participant API as .NET API
+  participant B as Bitly
+  participant PG as Payment Gateway
+  participant DB as SQL
+  UI->>API: Create/Update Lead
+  API-->>UI: LeadId
+  UI->>API: Request Payment Link (LeadId)
+  API->>B: Create short link (target PG URL)
+  B-->>API: shortUrl
+  API-->>UI: shortUrl + pgUrl
+  UI->>PG: Redirect & pay
+  PG-->>API: Signed webhook (success)
+  API->>DB: Mark lead converted & payment success

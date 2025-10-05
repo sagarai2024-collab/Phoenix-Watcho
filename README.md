@@ -1,1 +1,66 @@
-# Phoenix-Watcho
+# Phoenix & Watcho — Subscriber & Lead Management (React 18 + .NET 9 + SQL Server)
+
+**Author:** *Sagarika Chakraborty*  
+*Full Stack .NET Engineer | React.js | Web API / Web Developer | SQL Server*
+
+> Enterprise web app for DTH subscriber lifecycle, package configuration, and lead conversion with Bitly‑powered payments, integrating **DishTV** and **D2H**.
+
+## ✨ Features
+- Role‑based auth for **Normal** and **Corporate** users
+- Fetch subscribers by **VC Number**; view **real‑time package/billing**
+- **Package Configuration Tool** with rules/eligibility checks
+- **Lead Management** with targeted package offers & payment link generation
+- **DishTV & D2H synchronization** via resilient background jobs
+- CI/CD via **TFS pipelines**; secure storage on **Azure Blob**
+
+## 🏗️ Architecture
+![architecture](docs/architecture.png)
+
+```
+/phoenix-watcho
+  /src
+    /webapp-react
+    /api-dotnet
+    /jobs
+    /shared
+  /infra
+    /sql
+    /pipelines
+  /docs
+    HLD.md
+    LLD.md
+    API.md
+    architecture.png
+  /tests
+    /api
+    /web
+```
+
+## 🔧 Tech Stack
+- **Frontend**: React.js 18
+- **Backend**: .NET Core 9.0 (REST APIs & Web App), Visual Studio 2022 v11.7
+- **Database**: Microsoft SQL Server 2021
+- **Storage/Cloud**: Azure Blob Storage, Azure Client SDKs
+- **CI/CD**: TFS (Team Foundation Server)
+
+## 🚀 Getting Started
+1. **API**: `.NET 9 SDK` → `dotnet restore && dotnet run`  
+2. **Web**: `Node 20+` → `npm i && npm run dev`  
+3. **DB**: run `infra/sql/init.sql` to seed dev data  
+4. **Config**: set **Bitly token**, Dish/D2H sandbox creds, Blob connection/MI in app settings.
+
+## 🧪 Testing
+- `dotnet test` for API; `npm test` for web; E2E via Playwright/Cypress.
+
+## 🔐 Security
+- JWT + RBAC, input validation, secret rotation, signed webhooks, TLS 1.2+.
+
+## 📈 Observability
+- Structured logs, latency/error metrics, traces; alerts in CI/CD.
+
+## 🗺️ Diagrams
+- Full Mermaid sources are in **docs/architecture.mmd**. GitHub renders Mermaid in Markdown directly.
+- The included **docs/architecture.png** is a placeholder export. Replace it with a PNG exported from draw.io or Mermaid CLI if desired.
+
+## 📄 License
+MIT

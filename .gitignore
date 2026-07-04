@@ -1,0 +1,17 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# React / Node
+ClientApp/node_modules/
+ClientApp/dist/
+
+# Uploaded documents (user data)
+wwwroot/uploads/
+
+# Local settings
+appsettings.Development.json
+*.log

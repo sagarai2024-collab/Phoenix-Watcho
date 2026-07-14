@@ -5,7 +5,7 @@ A full-stack consumer portal with a **live AI-powered chatbot** built using **RA
 ## Features
 
 ### AI Chatbot (RAG Pipeline)
-- **Retrieve** — knowledge-base search over SQL Server with relevance scoring (cosine-similarity-style ranking)
+- **Retrieve** — **hybrid search**: vector search using true cosine similarity (`cos θ = A·B / |A|·|B|`) over bag-of-words vectors, with keyword-overlap fallback for exact terms. KB vectors are pre-computed and cached like an in-memory vector index (`Services/VectorSearchService.cs`)
 - **Augment** — retrieved context injected into structured prompts
 - **Generate** — natural responses via Semantic Kernel `InvokePromptAsync` (Azure OpenAI GPT-4o-mini / Gemini)
 - **Hallucination prevention** — responses grounded only to verified knowledge-base content

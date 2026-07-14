@@ -6,12 +6,14 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using StudentLearningPortal.Data;
 using StudentLearningPortal.Models;
+using StudentLearningPortal.Services;
 
 namespace StudentLearningPortal.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ChatController(IConfiguration config, AppDbContext db, Kernel kernel, IMemoryCache cache) : ControllerBase
+public class ChatController(IConfiguration config, AppDbContext db, Kernel kernel,
+                            IMemoryCache cache, VectorSearchService vectorSearch) : ControllerBase
 {
     private const string SystemPrompt = """
         You are a helpful assistant for Greenland University's student registration portal.
@@ -201,9 +203,25 @@ public class ChatController(IConfiguration config, AppDbContext db, Kernel kerne
         return "I can help you with:\n• Courses offered\n• Fees & eligibility\n• Registration process\n• Documents needed\n• Contact info\n\nWhat would you like to know?";
     }
 
-    // Cached keyword search — loads KB from DB once per hour instead of every request
+    // HYBRID RAG RETRIEVAL — vector search (cosine similarity) first, keyword fallback.
+    // KB entries are vectorized ONCE and cached 1 hour — like a vector DB index in memory.
     private async Task<string?> RetrieveAsync(string query)
     {
+        // Load KB and pre-compute its word-frequency vectors (the "index")
+        var kbVectors = await cache.GetOrCreateAsync("kb_vectors", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+            var all = await db.KnowledgeBase.AsNoTracking().ToListAsync();
+            return all.Select(e =>
+                (Entry: e, Vector: vectorSearch.Vectorize($"{e.Keywords} {e.Question} {e.Answer}")))
+                .ToList();
+        });
+
+        // ── TIER 1: VECTOR SEARCH — true cosine similarity cos(θ) = A·B / (|A|·|B|)
+        var match = vectorSearch.Search(query, kbVectors!, threshold: 0.15);
+        if (match != null) return match.Value.Entry.Answer;
+
+        // ── TIER 2: KEYWORD FALLBACK — catches exact terms vector search may miss
         var queryWords = query
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Select(w => w.Trim('?', '.', '!', ','))
@@ -212,18 +230,12 @@ public class ChatController(IConfiguration config, AppDbContext db, Kernel kerne
 
         if (!queryWords.Any()) return null;
 
-        var allEntries = await cache.GetOrCreateAsync("kb_entries", async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
-            return await db.KnowledgeBase.AsNoTracking().ToListAsync();
-        });
-
-        var best = allEntries!
-            .Select(e =>
+        var best = kbVectors!
+            .Select(kv =>
             {
-                var text  = $"{e.Keywords} {e.Question} {e.Answer}".ToLower();
+                var text  = $"{kv.Entry.Keywords} {kv.Entry.Question} {kv.Entry.Answer}".ToLower();
                 var score = (double)queryWords.Count(w => text.Contains(w)) / queryWords.Count;
-                return new { Entry = e, Score = score };
+                return new { kv.Entry, Score = score };
             })
             .OrderByDescending(x => x.Score)
             .FirstOrDefault();

@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<StudentLearningPortal.Services.VectorSearchService>();
 builder.Services.AddResponseCompression();
 builder.Services.AddSpaStaticFiles(config => config.RootPath = "ClientApp/dist");
 

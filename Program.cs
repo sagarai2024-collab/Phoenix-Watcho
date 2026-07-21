@@ -9,6 +9,11 @@ builder.Services.AddControllers();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<VectorSearchService>();
 builder.Services.AddSingleton<BillingService>();
+
+// RAG services: OpenAI embeddings + Supabase pgvector + the pipeline orchestrator
+builder.Services.AddHttpClient<EmbeddingService>();
+builder.Services.AddHttpClient<SupabaseVectorService>();
+builder.Services.AddScoped<RagService>();
 builder.Services.AddResponseCompression();
 builder.Services.AddSpaStaticFiles(config => config.RootPath = "ClientApp/dist");
 

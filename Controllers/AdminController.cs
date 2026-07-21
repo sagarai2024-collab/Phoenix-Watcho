@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using PhoenixWatcho.Data;
 using PhoenixWatcho.Models;
+using PhoenixWatcho.Services;
 
 namespace PhoenixWatcho.Controllers;
 
@@ -155,7 +156,38 @@ public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBa
         db.KnowledgeBase.Remove(entry);
         await db.SaveChangesAsync();
         cache.Remove("kb_vectors");
+        cache.Remove("kb_suggestions");
         return Ok(new { message = "Deleted." });
+    }
+
+    // ── RAG ingestion ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Embed every knowledge-base entry with OpenAI and upsert the vectors into
+    /// Supabase pgvector. Run this once after seeding, and whenever the KB changes.
+    /// </summary>
+    [HttpPost("reindex")]
+    public async Task<IActionResult> Reindex(
+        [FromServices] EmbeddingService embedder,
+        [FromServices] SupabaseVectorService supabase)
+    {
+        if (!embedder.IsConfigured)
+            return BadRequest("OpenAI key not configured — add OpenAI:Key in appsettings.Development.json.");
+        if (!supabase.IsConfigured)
+            return BadRequest("Supabase not configured — add Supabase:Url and Supabase:ServiceKey in appsettings.Development.json.");
+
+        var entries = await db.KnowledgeBase.AsNoTracking().ToListAsync();
+        var docs = new List<KbVectorDoc>();
+        foreach (var e in entries)
+        {
+            // Embed question + answer + keywords for the richest match signal.
+            var embedding = await embedder.EmbedAsync($"{e.Question}\n{e.Answer}\n{e.Keywords}");
+            if (embedding is not null)
+                docs.Add(new KbVectorDoc(e.Id, e.Topic, e.Answer, embedding));
+        }
+
+        await supabase.UpsertAsync(docs);
+        return Ok(new { indexed = docs.Count, of = entries.Count });
     }
 }
 

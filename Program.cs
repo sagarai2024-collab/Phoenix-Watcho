@@ -1,12 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
-using StudentLearningPortal.Data;
+using PhoenixWatcho.Data;
+using PhoenixWatcho.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddMemoryCache();
-builder.Services.AddSingleton<StudentLearningPortal.Services.VectorSearchService>();
+builder.Services.AddSingleton<VectorSearchService>();
+builder.Services.AddSingleton<BillingService>();
 builder.Services.AddResponseCompression();
 builder.Services.AddSpaStaticFiles(config => config.RootPath = "ClientApp/dist");
 
@@ -28,6 +30,14 @@ if (openAIKey.StartsWith("sk-") && openAIKey.Length > 20)
 builder.Services.AddSingleton(kernelBuilder.Build());
 
 var app = builder.Build();
+
+// Apply migrations and seed reference + demo data on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+    await DbInitializer.SeedAsync(db);
+}
 
 app.UseResponseCompression();
 app.UseStaticFiles();

@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
-using StudentLearningPortal.Data;
-using StudentLearningPortal.Models;
-using StudentLearningPortal.Services;
+using PhoenixWatcho.Data;
+using PhoenixWatcho.Models;
+using PhoenixWatcho.Services;
 
-namespace StudentLearningPortal.Controllers;
+namespace PhoenixWatcho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -16,8 +16,9 @@ public class ChatController(IConfiguration config, AppDbContext db, Kernel kerne
                             IMemoryCache cache, VectorSearchService vectorSearch) : ControllerBase
 {
     private const string SystemPrompt = """
-        You are a helpful assistant for Greenland University's student registration portal.
+        You are the DishTV / Watcho customer support assistant.
         Answer questions only using the context provided. Be friendly and concise.
+        Amounts are in Indian Rupees (₹).
         """;
 
     [HttpGet("diagnose")]
@@ -25,7 +26,8 @@ public class ChatController(IConfiguration config, AppDbContext db, Kernel kerne
     {
         var key = config["OpenAI:Key"] ?? "(missing)";
         var skEnabled = kernel.Services.GetService<IChatCompletionService>() != null;
-        return Ok(new {
+        return Ok(new
+        {
             keyPreview = key.Length > 6 ? key[..6] + "..." : key,
             keyLength  = key.Length,
             model      = config["OpenAI:Model"] ?? "(missing)",
@@ -42,15 +44,13 @@ public class ChatController(IConfiguration config, AppDbContext db, Kernel kerne
 
         var reply = await GetReplyAsync(request);
 
-        // Log every conversation to the database for analytics
-        var log = new ChatLog
+        db.ChatLogs.Add(new ChatLog
         {
             UserMessage = request.Message,
             BotReply    = reply,
             Topic       = DetectTopic(request.Message.ToLower()),
             CreatedAt   = DateTime.UtcNow
-        };
-        db.ChatLogs.Add(log);
+        });
         await db.SaveChangesAsync();
 
         return Ok(new { reply });
@@ -60,133 +60,59 @@ public class ChatController(IConfiguration config, AppDbContext db, Kernel kerne
     {
         var msg = request.Message.ToLower().Trim();
 
-        // ── 1. EMAIL CHECK ────────────────────────────────────────────────────
-        var emailMatch = Regex.Match(request.Message, @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}");
-        if (emailMatch.Success)
+        // ── 1. VC NUMBER LOOKUP — 11-digit viewing card number ────────────────
+        var vcMatch = Regex.Match(request.Message, @"\b0\d{10}\b");
+        if (vcMatch.Success)
         {
-            var email   = emailMatch.Value.ToLower();
-            var student = await db.Students.AsNoTracking().FirstOrDefaultAsync(s => s.Email == email);
-            if (student != null)
-                return $"✅ '{email}' is already registered!\n" +
-                       $"• Name: {student.FullName}\n• Course: {student.Course}\n" +
-                       $"• Registered: {student.RegisteredAt:dd MMM yyyy}\n" +
-                       $"Please click Login to sign in.";
-            else
-                return $"❌ '{email}' is not found in our records.\n\n" +
-                       $"This could mean:\n" +
-                       $"• Wrong email address — please check the spelling\n" +
-                       $"• Not registered yet — click Register to create your account\n\n" +
-                       $"Please verify your email and try again.";
+            var vc = vcMatch.Value;
+            var subscriber = await db.Subscribers.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.VcNumber == vc);
+
+            if (subscriber == null)
+                return $"❌ VC number '{vc}' was not found in our records.\n" +
+                       "Please check the 11-digit number on the smart card inside your set-top box.";
+
+            var sub = await db.Subscriptions.AsNoTracking().Include(s => s.Plan)
+                .Where(s => s.SubscriberId == subscriber.Id)
+                .OrderByDescending(s => s.ExpiryDate)
+                .FirstOrDefaultAsync();
+
+            if (sub?.Plan == null)
+                return $"✅ VC {vc} — {subscriber.FullName}\nNo active plan found. Please recharge to start a pack.";
+
+            var statusLine = sub.Status switch
+            {
+                "Expired"  => $"🔴 EXPIRED {Math.Abs(sub.DaysRemaining)} day(s) ago — please recharge to resume service.",
+                "Expiring" => $"🟠 Expiring in {sub.DaysRemaining} day(s) — recharge soon to avoid interruption.",
+                _          => $"🟢 Active — {sub.DaysRemaining} day(s) remaining."
+            };
+            return $"✅ VC {vc} — {subscriber.FullName}\n" +
+                   $"• Plan: {sub.Plan.Name} (₹{sub.Plan.MonthlyPrice:0})\n" +
+                   $"• Valid till: {sub.ExpiryDate:dd MMM yyyy}\n" +
+                   $"• Status: {statusLine}";
         }
 
         // ── 2. GREETINGS ──────────────────────────────────────────────────────
         var greetingWords = new[] { "hi ", "hi!", "hi,", "hey", "hello", "good morning", "good evening", "good afternoon" };
-        bool isGreeting   = greetingWords.Any(g => msg.StartsWith(g)) || msg == "hi"
-                            || (msg.Split(' ').Length == 2 && msg.EndsWith(" here"));
-
+        bool isGreeting = greetingWords.Any(g => msg.StartsWith(g)) || msg == "hi";
         if (isGreeting)
-        {
-            var words = request.Message.Trim().Split(' ');
-            var name  = words.Length > 1 ? words[1].Trim(',', '!', '.') : words[0].Trim(',', '!', '.');
-            if (msg.EndsWith(" here")) name = words[0].Trim(',', '!', '.');
-            var greet = name.Length > 1 ? $"Hi {name}!" : "Hello!";
-            return $"{greet} Welcome to Greenland University. How can I help you today?\n\n" +
-                   "I can assist with:\n• Courses & eligibility\n• Registration process\n• Fees & documents\n• Contact info";
-        }
+            return "Hello! Welcome to DishTV / Watcho support. 📺 How can I help you today?\n\n" +
+                   "I can help with:\n• Plans & prices\n• Recharge & expiry\n• NCF / HD charges\n• KYC & new connection";
 
         // ── 3. THANKS & BYE ───────────────────────────────────────────────────
         if (msg.Contains("thank"))
-            return "You're welcome! Best of luck with your registration at Greenland University. 😊";
+            return "You're welcome! Enjoy your entertainment with DishTV. 😊";
+        if (msg.Contains("bye") || msg.Contains("goodbye"))
+            return "Goodbye! Recharge on time and keep watching. 👋";
 
-        if (msg.Contains("bye") || msg.Contains("goodbye") || msg.Contains("see you"))
-            return "Goodbye! Feel free to come back anytime. Good luck! 👋";
-
-        // ── 4. ACKNOWLEDGMENTS ────────────────────────────────────────────────
-        if (msg == "ok" || msg == "okay" || msg == "got it" || msg == "fine" ||
-            msg == "noted" || msg == "alright" || msg == "great" || msg == "nice")
-            return "Got it! 😊 Feel free to ask if you have any more questions.";
-
-        // ── 5. YES — context aware ────────────────────────────────────────────
-        bool isYes = msg.StartsWith("yes") || msg.StartsWith("yeah") || msg.StartsWith("yep") ||
-                     msg.StartsWith("sure") || msg.StartsWith("please") || msg.StartsWith("pls");
-        if (isYes)
-        {
-            var lastBotMsg = request.History.LastOrDefault(h => h.Role == "assistant")?.Content?.ToLower() ?? "";
-            if (lastBotMsg.Contains("contact"))
-                return "📞 Contact Details:\n• Email: admissions@greenlanduniversity.edu\n• Office hours: Mon–Fri, 9 AM to 5 PM";
-            if (lastBotMsg.Contains("course") || lastBotMsg.Contains("program"))
-                return "📚 Available Courses:\n• B.Tech CS\n• B.Tech ECE\n• B.Tech ME\n• BCA\n• BBA\n• MBA";
-            if (lastBotMsg.Contains("fee") || lastBotMsg.Contains("eligib"))
-                return "💰 Fees & Eligibility:\n• All programs: ₹900\n• B.Tech: 60% in 12th (PCM)\n• BCA: 55% in 12th (Maths)\n• BBA: 50% in 12th\n• MBA: Graduation required";
-            if (lastBotMsg.Contains("registr") || lastBotMsg.Contains("process") || lastBotMsg.Contains("step"))
-                return "📝 Registration Steps:\n1. Click Register tab\n2. Fill your details\n3. Upload documents\n4. Pay ₹900 fee\n5. Done!";
-            if (lastBotMsg.Contains("document"))
-                return "📄 Required Documents:\n1) 10th Marksheet\n2) 12th Marksheet\n3) Passport Photo\n4) Aadhaar Card";
-            return "📋 Eligibility:\n• B.Tech: 60% in 12th (PCM)\n• BCA: 55% in 12th\n• BBA: 50% in 12th\n• MBA: Graduation required\n\n" +
-                   "📞 Contact: admissions@greenlanduniversity.edu | Mon–Fri 9AM–5PM";
-        }
-
-        if (msg.StartsWith("no") || msg.StartsWith("nope") || msg.StartsWith("nah"))
-            return "No problem! Feel free to ask anytime. 😊";
-
-        // ── 6. SHOW ALL INFO ──────────────────────────────────────────────────
-        if (msg.Contains("all info") || msg.Contains("all detail") || msg.Contains("show detail") ||
-            msg.Contains("give info") || msg.Contains("full info") || msg.Contains("everything") ||
-            msg.Contains("tell me all") || msg.Contains("tell me about"))
-            return "📚 Courses: B.Tech (CS, ECE, ME), BCA, BBA, MBA\n\n" +
-                   "💰 Fee: ₹900 for all programs\n\n" +
-                   "📋 Eligibility:\n• B.Tech: 60% in 12th (PCM)\n• BCA: 55% in 12th\n• BBA: 50% in 12th\n• MBA: Graduation required\n\n" +
-                   "⏰ Deadline: June 30, 2025\n\n" +
-                   "📄 Documents: 10th & 12th Marksheet, Passport Photo, Aadhaar Card\n\n" +
-                   "📞 Contact: admissions@greenlanduniversity.edu | Mon–Fri 9AM–5PM";
-
-        // ── 7. ALREADY REGISTERED CHECK ──────────────────────────────────────
-        if (msg.Contains("already register") || msg.Contains("i am register") ||
-            msg.Contains("am i register")    || msg.Contains("i have register") ||
-            (msg.Contains("register") && (msg.Contains("am") || msg.Contains("already") || msg.Contains("check"))))
-            return "To check your registration, share your email address here and I will check instantly!";
-
-        // ── 8. SPECIFIC TOPIC KEYWORDS ────────────────────────────────────────
-        if (msg.Contains("registration process") || msg.Contains("how to register") ||
-            msg.Contains("how do i register")    || msg.Contains("steps to register") ||
-            msg.Contains("step"))
-            return "📝 Registration Steps:\n1. Click the Register tab\n2. Fill in your details\n3. Upload required documents\n4. Pay ₹900 fee online\n5. Registration complete!";
-
-        if (msg.Contains("contact") || msg.Contains("contact info") || msg.Contains("office") ||
-            (msg.Contains("email") && !emailMatch.Success))
-            return "📞 Contact Details:\n• Email: admissions@greenlanduniversity.edu\n• Office hours: Mon–Fri, 9 AM to 5 PM";
-
-        if (msg.Contains("document") || msg.Contains("upload") || msg.Contains("certificate") || msg.Contains("paper"))
-            return "📄 Required Documents:\n1) 10th Marksheet\n2) 12th Marksheet\n3) Passport Photo\n4) Aadhaar Card\n\nFormats: JPG, PNG, PDF (max 5MB)";
-
-        if (msg.Contains("eligib") || msg.Contains("qualify") || msg.Contains("marks") ||
-            msg.Contains("percentage") || msg.Contains("%"))
-            return "📋 Eligibility Criteria:\n• B.Tech: 60% in 12th with PCM\n• BCA: 55% in 12th with Maths\n• BBA: 50% in 12th (any stream)\n• MBA: Graduation in any stream";
-
-        if (msg.Contains("fee") || msg.Contains("cost") || msg.Contains("price") ||
-            msg.Contains("pay") || msg.Contains("amount"))
-            return "💰 Registration Fee: ₹900 for all programs (B.Tech, BCA, BBA, MBA)";
-
-        if (msg.Contains("course") || msg.Contains("program") || msg.Contains("offer") || msg.Contains("available"))
-            return "📚 Available Courses:\n• B.Tech CS\n• B.Tech ECE\n• B.Tech ME\n• BCA\n• BBA\n• MBA";
-
-        if (msg.Contains("deadline") || msg.Contains("last date"))
-            return "⏰ Registration Deadline: June 30, 2025. Apply soon!";
-
-        if (msg.Contains("duration") || msg.Contains("how long") ||
-            (msg.Contains("year") && !msg.Contains("register")))
-            return "🗓 Course Duration:\n• B.Tech: 4 years\n• MBA: 2 years\n• BCA / BBA: 3 years";
-
-        // ── 9. SK RAG — RETRIEVE → AUGMENT → GENERATE ────────────────────────
+        // ── 4. SK RAG — RETRIEVE → AUGMENT → GENERATE ─────────────────────────
         var context = await RetrieveAsync(msg);
-
         if (context != null)
         {
-            var prompt = $"{SystemPrompt}\n\nContext:\n{context}\n\nStudent question: {request.Message}\n\nAnswer:";
-
             var chatService = kernel.Services.GetService<IChatCompletionService>();
             if (chatService != null)
             {
+                var prompt = $"{SystemPrompt}\n\nContext:\n{context}\n\nSubscriber question: {request.Message}\n\nAnswer:";
                 try
                 {
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -195,19 +121,17 @@ public class ChatController(IConfiguration config, AppDbContext db, Kernel kerne
                 }
                 catch (Exception ex) { return $"AI Error: {ex.Message}"; }
             }
-
-            return context;
+            return context; // no AI key → return grounded KB answer directly
         }
 
-        // ── 10. DEFAULT ───────────────────────────────────────────────────────
-        return "I can help you with:\n• Courses offered\n• Fees & eligibility\n• Registration process\n• Documents needed\n• Contact info\n\nWhat would you like to know?";
+        // ── 5. DEFAULT ────────────────────────────────────────────────────────
+        return "I can help you with:\n• Plans & prices\n• Recharge & plan expiry\n• NCF & HD charges\n• Discounts & offers\n• KYC documents\n\n" +
+               "Tip: type your 11-digit VC number and I'll show your current plan & expiry.";
     }
 
     // HYBRID RAG RETRIEVAL — vector search (cosine similarity) first, keyword fallback.
-    // KB entries are vectorized ONCE and cached 1 hour — like a vector DB index in memory.
     private async Task<string?> RetrieveAsync(string query)
     {
-        // Load KB and pre-compute its word-frequency vectors (the "index")
         var kbVectors = await cache.GetOrCreateAsync("kb_vectors", async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
@@ -217,18 +141,16 @@ public class ChatController(IConfiguration config, AppDbContext db, Kernel kerne
                 .ToList();
         });
 
-        // ── TIER 1: VECTOR SEARCH — true cosine similarity cos(θ) = A·B / (|A|·|B|)
         var match = vectorSearch.Search(query, kbVectors!, threshold: 0.15);
         if (match != null) return match.Value.Entry.Answer;
 
-        // ── TIER 2: KEYWORD FALLBACK — catches exact terms vector search may miss
         var queryWords = query
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Select(w => w.Trim('?', '.', '!', ','))
             .Where(w => w.Length > 2)
             .ToList();
 
-        if (!queryWords.Any()) return null;
+        if (queryWords.Count == 0) return null;
 
         var best = kbVectors!
             .Select(kv =>
@@ -245,14 +167,14 @@ public class ChatController(IConfiguration config, AppDbContext db, Kernel kerne
 
     private static string DetectTopic(string msg)
     {
-        if (msg.Contains("fee") || msg.Contains("cost") || msg.Contains("pay"))    return "fee";
-        if (msg.Contains("course") || msg.Contains("program"))                      return "course";
-        if (msg.Contains("eligib") || msg.Contains("qualify") || msg.Contains("%")) return "eligibility";
-        if (msg.Contains("document") || msg.Contains("upload"))                     return "document";
-        if (msg.Contains("register") || msg.Contains("step"))                       return "registration";
-        if (msg.Contains("contact") || msg.Contains("office"))                      return "contact";
-        if (msg.Contains("deadline") || msg.Contains("last date"))                  return "deadline";
-        if (msg.Contains("duration") || msg.Contains("year"))                       return "duration";
+        if (msg.Contains("recharge") || msg.Contains("pay") || msg.Contains("renew"))   return "recharge";
+        if (msg.Contains("plan") || msg.Contains("pack") || msg.Contains("price"))       return "plan";
+        if (msg.Contains("expire") || msg.Contains("expiry") || msg.Contains("validity")) return "expiry";
+        if (msg.Contains("ncf"))                                                          return "ncf";
+        if (msg.Contains("hd"))                                                           return "hd";
+        if (msg.Contains("discount") || msg.Contains("offer"))                            return "discount";
+        if (msg.Contains("kyc") || msg.Contains("document") || msg.Contains("aadhaar"))   return "kyc";
+        if (msg.Contains("support") || msg.Contains("help") || msg.Contains("contact"))   return "support";
         return "general";
     }
 }

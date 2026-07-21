@@ -1,6 +1,6 @@
-using StudentLearningPortal.Models;
+using PhoenixWatcho.Models;
 
-namespace StudentLearningPortal.Services;
+namespace PhoenixWatcho.Services;
 
 /// <summary>
 /// Vector search over the Knowledge Base using bag-of-words vectors
@@ -30,11 +30,11 @@ public class VectorSearchService
             .ToDictionary(g => g.Key, g => g.Count());
     }
 
-    /// <summary>Light stemming so "documents" and "document" become the same token.</summary>
+    /// <summary>Light stemming so "channels" and "channel" become the same token.</summary>
     private static string Stem(string word)
     {
-        if (word.EndsWith("ies") && word.Length > 4) return word[..^3] + "y"; // facilities → facility
-        if (word.EndsWith("s") && word.Length > 3)   return word[..^1];       // documents → document, courses → course
+        if (word.EndsWith("ies") && word.Length > 4) return word[..^3] + "y";
+        if (word.EndsWith("s") && word.Length > 3)   return word[..^1];
         return word;
     }
 
@@ -46,11 +46,9 @@ public class VectorSearchService
     {
         if (a.Count == 0 || b.Count == 0) return 0;
 
-        // Dot product: multiply counts of words present in BOTH vectors
         double dot = a.Keys.Intersect(b.Keys)
                       .Sum(w => (double)a[w] * b[w]);
 
-        // Magnitudes: |A| = sqrt(sum of squared counts)
         double magA = Math.Sqrt(a.Values.Sum(v => (double)v * v));
         double magB = Math.Sqrt(b.Values.Sum(v => (double)v * v));
 

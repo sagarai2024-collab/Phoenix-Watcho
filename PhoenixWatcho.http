@@ -1,0 +1,11 @@
+@PhoenixWatcho_HostAddress = http://localhost:5000
+
+### All available plans (with itemized billing)
+GET {{PhoenixWatcho_HostAddress}}/api/plan
+Accept: application/json
+
+### Plan + expiry + billing for a subscriber (seeded active VC)
+GET {{PhoenixWatcho_HostAddress}}/api/plan/subscriber/01234567890
+Accept: application/json
+
+###

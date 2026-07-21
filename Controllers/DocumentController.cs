@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using StudentLearningPortal.Data;
-using StudentLearningPortal.Models;
+using PhoenixWatcho.Data;
+using PhoenixWatcho.Models;
 
-namespace StudentLearningPortal.Controllers;
+namespace PhoenixWatcho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -13,7 +13,7 @@ public class DocumentController(AppDbContext db, IWebHostEnvironment env) : Cont
     private const long MaxFileSize = 5 * 1024 * 1024; // 5 MB
 
     [HttpPost("upload")]
-    public async Task<IActionResult> Upload([FromForm] int studentId,
+    public async Task<IActionResult> Upload([FromForm] int subscriberId,
                                             [FromForm] string documentType,
                                             IFormFile file)
     {
@@ -27,12 +27,11 @@ public class DocumentController(AppDbContext db, IWebHostEnvironment env) : Cont
         if (!AllowedTypes.Contains(ext))
             return BadRequest("Only JPG, PNG and PDF files are allowed.");
 
-        var studentExists = await db.Students.AnyAsync(s => s.Id == studentId);
-        if (!studentExists)
-            return NotFound("Student not found.");
+        var subscriberExists = await db.Subscribers.AnyAsync(s => s.Id == subscriberId);
+        if (!subscriberExists)
+            return NotFound("Subscriber not found.");
 
-        // Save file to wwwroot/uploads/{studentId}/
-        var uploadFolder = Path.Combine(env.WebRootPath ?? "wwwroot", "uploads", studentId.ToString());
+        var uploadFolder = Path.Combine(env.WebRootPath ?? "wwwroot", "uploads", subscriberId.ToString());
         Directory.CreateDirectory(uploadFolder);
 
         var uniqueName = $"{documentType}_{Guid.NewGuid()}{ext}";
@@ -41,28 +40,27 @@ public class DocumentController(AppDbContext db, IWebHostEnvironment env) : Cont
         using (var stream = new FileStream(filePath, FileMode.Create))
             await file.CopyToAsync(stream);
 
-        // Save record to DB
-        var doc = new StudentDocument
+        var doc = new KycDocument
         {
-            StudentId    = studentId,
+            SubscriberId = subscriberId,
             DocumentType = documentType,
             FileName     = file.FileName,
-            FilePath     = $"/uploads/{studentId}/{uniqueName}",
+            FilePath     = $"/uploads/{subscriberId}/{uniqueName}",
             UploadedAt   = DateTime.UtcNow
         };
 
-        db.StudentDocuments.Add(doc);
+        db.KycDocuments.Add(doc);
         await db.SaveChangesAsync();
 
         return Ok(new { message = "Document uploaded successfully!", filePath = doc.FilePath });
     }
 
-    [HttpGet("{studentId}")]
-    public async Task<IActionResult> GetDocuments(int studentId)
+    [HttpGet("{subscriberId}")]
+    public async Task<IActionResult> GetDocuments(int subscriberId)
     {
-        var docs = await db.StudentDocuments
-            .Where(d => d.StudentId == studentId)
-            .Select(d => new { d.Id, d.DocumentType, d.FileName, d.FilePath, d.UploadedAt })
+        var docs = await db.KycDocuments
+            .Where(d => d.SubscriberId == subscriberId)
+            .Select(d => new { d.Id, d.DocumentType, d.FileName, d.FilePath, d.UploadedAt, d.Status })
             .ToListAsync();
 
         return Ok(docs);

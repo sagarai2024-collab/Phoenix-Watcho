@@ -1,44 +1,57 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using StudentLearningPortal.Data;
-using StudentLearningPortal.Models;
+using PhoenixWatcho.Data;
+using PhoenixWatcho.Models;
 
-namespace StudentLearningPortal.Controllers;
+namespace PhoenixWatcho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBase
 {
-    // ── Students ──────────────────────────────────────────────────────────────
+    // ── Subscribers ─────────────────────────────────────────────────────────
 
-    [HttpGet("students")]
-    public async Task<IActionResult> GetStudents()
+    [HttpGet("subscribers")]
+    public async Task<IActionResult> GetSubscribers()
     {
-        var students = await db.Students
+        var subs = await db.Subscribers
             .AsNoTracking()
             .Select(s => new
             {
-                s.Id, s.FullName, s.Email, s.Course, s.Phone,
-                s.Gender, s.RegisteredAt,
-                DocumentCount  = db.StudentDocuments.Count(d => d.StudentId == s.Id),
-                PendingDocs    = db.StudentDocuments.Count(d => d.StudentId == s.Id && d.Status == "Pending"),
-                ApprovedDocs   = db.StudentDocuments.Count(d => d.StudentId == s.Id && d.Status == "Approved"),
+                s.Id, s.VcNumber, s.FullName, s.Email, s.Phone, s.City, s.State, s.RegisteredAt,
+                CurrentPlan = db.Subscriptions
+                    .Where(sub => sub.SubscriberId == s.Id)
+                    .OrderByDescending(sub => sub.ExpiryDate)
+                    .Select(sub => sub.Plan!.Name)
+                    .FirstOrDefault(),
+                ExpiryDate = db.Subscriptions
+                    .Where(sub => sub.SubscriberId == s.Id)
+                    .OrderByDescending(sub => sub.ExpiryDate)
+                    .Select(sub => (DateTime?)sub.ExpiryDate)
+                    .FirstOrDefault(),
+                PendingDocs = db.KycDocuments.Count(d => d.SubscriberId == s.Id && d.Status == "Pending"),
             })
             .OrderByDescending(s => s.RegisteredAt)
             .ToListAsync();
 
-        return Ok(students);
+        return Ok(subs);
     }
 
-    // ── Documents ─────────────────────────────────────────────────────────────
+    // ── Plans ───────────────────────────────────────────────────────────────
+
+    [HttpGet("plans")]
+    public async Task<IActionResult> GetPlans() =>
+        Ok(await db.Plans.AsNoTracking().OrderBy(p => p.MonthlyPrice).ToListAsync());
+
+    // ── KYC Documents ───────────────────────────────────────────────────────
 
     [HttpGet("documents")]
     public async Task<IActionResult> GetDocuments([FromQuery] string? status = null)
     {
-        var query = db.StudentDocuments
+        var query = db.KycDocuments
             .AsNoTracking()
-            .Include(d => d.Student)
+            .Include(d => d.Subscriber)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(status))
@@ -48,10 +61,9 @@ public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBa
             .OrderByDescending(d => d.UploadedAt)
             .Select(d => new
             {
-                d.Id, d.DocumentType, d.FileName, d.FilePath,
-                d.Status, d.UploadedAt,
-                StudentName = d.Student!.FullName,
-                StudentEmail = d.Student.Email
+                d.Id, d.DocumentType, d.FileName, d.FilePath, d.Status, d.UploadedAt,
+                SubscriberName = d.Subscriber!.FullName,
+                VcNumber = d.Subscriber.VcNumber
             })
             .ToListAsync();
 
@@ -61,7 +73,7 @@ public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBa
     [HttpPut("document/{id}/status")]
     public async Task<IActionResult> UpdateDocumentStatus(int id, [FromBody] UpdateStatusRequest req)
     {
-        var doc = await db.StudentDocuments.FindAsync(id);
+        var doc = await db.KycDocuments.FindAsync(id);
         if (doc == null) return NotFound("Document not found.");
 
         doc.Status = req.Status; // Pending, Approved, Rejected
@@ -69,7 +81,7 @@ public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBa
         return Ok(new { message = $"Document {req.Status}.", doc.Status });
     }
 
-    // ── Chat Logs ─────────────────────────────────────────────────────────────
+    // ── Chat Logs ───────────────────────────────────────────────────────────
 
     [HttpGet("chatlogs")]
     public async Task<IActionResult> GetChatLogs([FromQuery] int take = 50)
@@ -92,14 +104,17 @@ public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBa
             .OrderByDescending(x => x.Count)
             .ToListAsync();
 
-        var totalChats    = await db.ChatLogs.CountAsync();
-        var totalStudents = await db.Students.CountAsync();
-        var pendingDocs   = await db.StudentDocuments.CountAsync(d => d.Status == "Pending");
+        var totalChats       = await db.ChatLogs.CountAsync();
+        var totalSubscribers = await db.Subscribers.CountAsync();
+        var expiredCount     = await db.Subscriptions
+            .GroupBy(s => s.SubscriberId)
+            .Select(g => g.OrderByDescending(x => x.ExpiryDate).First())
+            .CountAsync(s => s.ExpiryDate < DateTime.UtcNow);
 
-        return Ok(new { totalChats, totalStudents, pendingDocs, topicCounts });
+        return Ok(new { totalChats, totalSubscribers, expiredCount, topicCounts });
     }
 
-    // ── Knowledge Base CRUD ───────────────────────────────────────────────────
+    // ── Knowledge Base CRUD ─────────────────────────────────────────────────
 
     [HttpGet("kb")]
     public async Task<IActionResult> GetKb() =>
@@ -111,7 +126,7 @@ public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBa
         entry.Id = 0;
         db.KnowledgeBase.Add(entry);
         await db.SaveChangesAsync();
-        cache.Remove("kb_entries"); // invalidate cache
+        cache.Remove("kb_vectors");
         return Ok(entry);
     }
 
@@ -127,7 +142,7 @@ public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBa
         existing.Keywords = entry.Keywords;
 
         await db.SaveChangesAsync();
-        cache.Remove("kb_entries"); // invalidate cache so chatbot picks up changes
+        cache.Remove("kb_vectors"); // invalidate so chatbot picks up changes
         return Ok(existing);
     }
 
@@ -139,7 +154,7 @@ public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBa
 
         db.KnowledgeBase.Remove(entry);
         await db.SaveChangesAsync();
-        cache.Remove("kb_entries");
+        cache.Remove("kb_vectors");
         return Ok(new { message = "Deleted." });
     }
 }

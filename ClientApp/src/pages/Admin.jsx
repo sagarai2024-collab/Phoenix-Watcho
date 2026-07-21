@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 const ADMIN_PASSWORD = "admin123";
+const rupee = (n) => "₹" + Number(n).toLocaleString("en-IN");
 
 const STATUS_BADGE = {
   Approved: { bg: "#dcfce7", color: "#16a34a" },
@@ -23,33 +24,30 @@ export default function Admin({ onBack }) {
   const [pwdErr, setPwdErr]   = useState("");
   const [tab, setTab]         = useState("analytics");
 
-  const [analytics, setAnalytics] = useState(null);
-  const [students, setStudents]   = useState([]);
-  const [docs, setDocs]           = useState([]);
-  const [logs, setLogs]           = useState([]);
-  const [kb, setKb]               = useState([]);
+  const [analytics, setAnalytics]     = useState(null);
+  const [subscribers, setSubscribers] = useState([]);
+  const [plans, setPlans]             = useState([]);
+  const [docs, setDocs]               = useState([]);
+  const [logs, setLogs]               = useState([]);
+  const [kb, setKb]                   = useState([]);
 
   const [kbForm, setKbForm]       = useState({ id: 0, topic: "", question: "", answer: "", keywords: "" });
   const [kbEditing, setKbEditing] = useState(false);
 
   const load = useCallback(async (section) => {
     try {
-      if (section === "analytics") {
-        const r = await fetch("/api/admin/analytics");
-        setAnalytics(await r.json());
-      } else if (section === "students") {
-        const r = await fetch("/api/admin/students");
-        setStudents(await r.json());
-      } else if (section === "documents") {
-        const r = await fetch("/api/admin/documents");
-        setDocs(await r.json());
-      } else if (section === "chatlogs") {
-        const r = await fetch("/api/admin/chatlogs");
-        setLogs(await r.json());
-      } else if (section === "kb") {
-        const r = await fetch("/api/admin/kb");
-        setKb(await r.json());
-      }
+      const map = {
+        analytics:   ["/api/admin/analytics",   setAnalytics],
+        subscribers: ["/api/admin/subscribers",  setSubscribers],
+        plans:       ["/api/admin/plans",        setPlans],
+        documents:   ["/api/admin/documents",    setDocs],
+        chatlogs:    ["/api/admin/chatlogs",     setLogs],
+        kb:          ["/api/admin/kb",           setKb],
+      };
+      const entry = map[section];
+      if (!entry) return;
+      const r = await fetch(entry[0]);
+      entry[1](await r.json());
     } catch { /* ignore */ }
   }, []);
 
@@ -84,6 +82,9 @@ export default function Admin({ onBack }) {
     load("kb");
   };
 
+  const th = { padding: "10px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 700, color: "#374151" };
+  const td = { padding: "10px 12px" };
+
   // ── Password gate ─────────────────────────────────────────────────────────
   if (!authed) {
     return (
@@ -101,49 +102,50 @@ export default function Admin({ onBack }) {
         <p className="switch-link" style={{ marginTop: "1rem" }}>
           <button onClick={onBack}>← Back to Portal</button>
         </p>
+        <p style={{ fontSize: "12px", color: "#a0aec0", marginTop: "0.5rem" }}>Demo password: <strong>admin123</strong></p>
       </div>
     );
   }
 
   const TABS = [
-    { key: "analytics", label: "📊 Analytics" },
-    { key: "students",  label: "👥 Students"  },
-    { key: "documents", label: "📄 Documents" },
-    { key: "chatlogs",  label: "💬 Chat Logs" },
-    { key: "kb",        label: "🧠 Knowledge Base" },
+    { key: "analytics",   label: "📊 Analytics" },
+    { key: "subscribers", label: "👥 Subscribers" },
+    { key: "plans",       label: "📦 Plans" },
+    { key: "documents",   label: "📄 KYC" },
+    { key: "chatlogs",    label: "💬 Chat Logs" },
+    { key: "kb",          label: "🧠 Knowledge Base" },
   ];
 
   return (
-    <div style={{ maxWidth: "900px", margin: "0 auto", padding: "0 1rem" }}>
+    <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 1rem", width: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
         <h2 style={{ margin: 0 }}>Admin Panel</h2>
-        <button className="btn-secondary" onClick={onBack}>← Back to Portal</button>
+        <button className="btn-secondary" style={{ marginTop: 0 }} onClick={onBack}>← Back to Portal</button>
       </div>
 
-      {/* ── Tabs ── */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "1.2rem" }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             style={{ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: 600, fontSize: "13px",
-              background: tab === t.key ? "#2563eb" : "#f1f5f9", color: tab === t.key ? "#fff" : "#374151" }}>
+              background: tab === t.key ? "#e2231a" : "#f1f5f9", color: tab === t.key ? "#fff" : "#374151" }}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* ── Analytics ── */}
+      {/* Analytics */}
       {tab === "analytics" && analytics && (
         <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem", marginBottom: "1.2rem" }}>
+          <div className="stat-grid">
             {[
-              { icon: "💬", label: "Total Chats",    value: analytics.totalChats },
-              { icon: "👥", label: "Total Students", value: analytics.totalStudents },
-              { icon: "⏳", label: "Pending Docs",   value: analytics.pendingDocs },
+              { icon: "💬", label: "Total Chats",       value: analytics.totalChats },
+              { icon: "👥", label: "Total Subscribers", value: analytics.totalSubscribers },
+              { icon: "🔴", label: "Expired Plans",     value: analytics.expiredCount },
             ].map(c => (
-              <div key={c.label} className="form-card" style={{ textAlign: "center", padding: "1.2rem 0.8rem" }}>
-                <div style={{ fontSize: "28px" }}>{c.icon}</div>
-                <div style={{ fontSize: "12px", color: "#888", marginTop: "6px" }}>{c.label}</div>
-                <div style={{ fontWeight: 700, fontSize: "22px", marginTop: "4px" }}>{c.value}</div>
+              <div key={c.label} className="stat-card">
+                <div className="stat-icon">{c.icon}</div>
+                <div className="stat-label">{c.label}</div>
+                <div className="stat-value" style={{ fontSize: "22px" }}>{c.value}</div>
               </div>
             ))}
           </div>
@@ -153,7 +155,7 @@ export default function Admin({ onBack }) {
               <div key={t.topic} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
                 <div style={{ width: "90px", fontSize: "13px", fontWeight: 600, color: "#374151", textTransform: "capitalize" }}>{t.topic}</div>
                 <div style={{ flex: 1, background: "#f1f5f9", borderRadius: "6px", overflow: "hidden" }}>
-                  <div style={{ height: "20px", background: "#2563eb", width: `${Math.min(100, (t.count / (analytics.totalChats || 1)) * 100 * 3)}%`, minWidth: "4px", borderRadius: "6px" }} />
+                  <div style={{ height: "20px", background: "#e2231a", width: `${Math.min(100, (t.count / (analytics.totalChats || 1)) * 100 * 3)}%`, minWidth: "4px", borderRadius: "6px" }} />
                 </div>
                 <div style={{ width: "30px", fontSize: "13px", color: "#888" }}>{t.count}</div>
               </div>
@@ -163,120 +165,119 @@ export default function Admin({ onBack }) {
         </div>
       )}
 
-      {/* ── Students ── */}
-      {tab === "students" && (
+      {/* Subscribers */}
+      {tab === "subscribers" && (
         <div className="form-card" style={{ overflowX: "auto" }}>
-          <h3 style={{ marginTop: 0 }}>Registered Students ({students.length})</h3>
+          <h3 style={{ marginTop: 0 }}>Subscribers ({subscribers.length})</h3>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                {["Name","Email","Course","Phone","Registered","Docs"].map(h => (
-                  <th key={h} style={{ padding: "10px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 700, color: "#374151" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
+            <thead><tr style={{ background: "#f8fafc" }}>
+              {["VC Number","Name","Current Plan","Expires","City","Pending KYC"].map(h => <th key={h} style={th}>{h}</th>)}
+            </tr></thead>
             <tbody>
-              {students.map(s => (
+              {subscribers.map(s => (
                 <tr key={s.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "10px 12px", fontWeight: 600 }}>{s.fullName}</td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{s.email}</td>
-                  <td style={{ padding: "10px 12px" }}>{s.course}</td>
-                  <td style={{ padding: "10px 12px" }}>{s.phone}</td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{new Date(s.registeredAt).toLocaleDateString()}</td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <span style={{ fontWeight: 600 }}>{s.approvedDocs}</span>
-                    <span style={{ color: "#aaa" }}>/{s.documentCount}</span>
-                  </td>
+                  <td style={{ ...td, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{s.vcNumber}</td>
+                  <td style={td}>{s.fullName}</td>
+                  <td style={td}>{s.currentPlan || "—"}</td>
+                  <td style={{ ...td, color: "#6b7280" }}>{s.expiryDate ? new Date(s.expiryDate).toLocaleDateString("en-IN") : "—"}</td>
+                  <td style={td}>{s.city}</td>
+                  <td style={td}>{s.pendingDocs}</td>
                 </tr>
               ))}
-              {students.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: "20px", textAlign: "center", color: "#888" }}>No students yet.</td></tr>
-              )}
+              {subscribers.length === 0 && <tr><td colSpan={6} style={{ padding: "20px", textAlign: "center", color: "#888" }}>No subscribers yet.</td></tr>}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* ── Documents ── */}
+      {/* Plans */}
+      {tab === "plans" && (
+        <div className="form-card" style={{ overflowX: "auto" }}>
+          <h3 style={{ marginTop: 0 }}>Plans ({plans.length})</h3>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <thead><tr style={{ background: "#f8fafc" }}>
+              {["Code","Name","Tier","Base Price","Discount","Channels","HD","Validity"].map(h => <th key={h} style={th}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {plans.map(p => (
+                <tr key={p.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  <td style={{ ...td, fontWeight: 600 }}>{p.code}</td>
+                  <td style={td}>{p.name}</td>
+                  <td style={td}>{p.tier}</td>
+                  <td style={td}>{rupee(p.monthlyPrice)}</td>
+                  <td style={td}>{p.discountPercent}%</td>
+                  <td style={td}>{p.channelCount}</td>
+                  <td style={td}>{p.isHd ? "✅" : "—"}</td>
+                  <td style={td}>{p.validityDays}d</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* KYC Documents */}
       {tab === "documents" && (
         <div className="form-card" style={{ overflowX: "auto" }}>
-          <h3 style={{ marginTop: 0 }}>Document Verification</h3>
+          <h3 style={{ marginTop: 0 }}>KYC Verification</h3>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                {["Student","Type","File","Uploaded","Status","Actions"].map(h => (
-                  <th key={h} style={{ padding: "10px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 700, color: "#374151" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
+            <thead><tr style={{ background: "#f8fafc" }}>
+              {["Subscriber","VC Number","Type","File","Status","Actions"].map(h => <th key={h} style={th}>{h}</th>)}
+            </tr></thead>
             <tbody>
               {docs.map(d => (
                 <tr key={d.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "10px 12px", fontWeight: 600 }}>{d.studentName}</td>
-                  <td style={{ padding: "10px 12px" }}>{d.documentType}</td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: "12px" }}>{d.fileName}</td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{new Date(d.uploadedAt).toLocaleDateString()}</td>
-                  <td style={{ padding: "10px 12px" }}><Badge status={d.status} /></td>
-                  <td style={{ padding: "10px 12px" }}>
+                  <td style={{ ...td, fontWeight: 600 }}>{d.subscriberName}</td>
+                  <td style={{ ...td, fontVariantNumeric: "tabular-nums" }}>{d.vcNumber}</td>
+                  <td style={td}>{d.documentType}</td>
+                  <td style={{ ...td, color: "#6b7280", fontSize: "12px" }}>{d.fileName}</td>
+                  <td style={td}><Badge status={d.status} /></td>
+                  <td style={td}>
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button onClick={() => updateDocStatus(d.id, "Approved")}
-                        style={{ background: "#dcfce7", color: "#16a34a", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
-                        ✅ Approve
-                      </button>
+                        style={{ background: "#dcfce7", color: "#16a34a", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>✅ Approve</button>
                       <button onClick={() => updateDocStatus(d.id, "Rejected")}
-                        style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
-                        ❌ Reject
-                      </button>
+                        style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>❌ Reject</button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {docs.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: "20px", textAlign: "center", color: "#888" }}>No documents uploaded yet.</td></tr>
-              )}
+              {docs.length === 0 && <tr><td colSpan={6} style={{ padding: "20px", textAlign: "center", color: "#888" }}>No KYC documents uploaded yet.</td></tr>}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* ── Chat Logs ── */}
+      {/* Chat Logs */}
       {tab === "chatlogs" && (
         <div className="form-card" style={{ overflowX: "auto" }}>
           <h3 style={{ marginTop: 0 }}>Recent Chat Logs ({logs.length})</h3>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                {["Time","Topic","Student Message","Bot Reply"].map(h => (
-                  <th key={h} style={{ padding: "10px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 700, color: "#374151" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
+            <thead><tr style={{ background: "#f8fafc" }}>
+              {["Time","Topic","User Message","Bot Reply"].map(h => <th key={h} style={th}>{h}</th>)}
+            </tr></thead>
             <tbody>
               {logs.map(l => (
                 <tr key={l.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "10px 12px", color: "#6b7280", whiteSpace: "nowrap" }}>{new Date(l.createdAt).toLocaleString()}</td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <Badge status={l.topic.charAt(0).toUpperCase() + l.topic.slice(1)} />
-                  </td>
-                  <td style={{ padding: "10px 12px", maxWidth: "220px" }}>{l.userMessage}</td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280", maxWidth: "280px", whiteSpace: "pre-wrap", fontSize: "12px" }}>{l.botReply.slice(0, 120)}{l.botReply.length > 120 ? "…" : ""}</td>
+                  <td style={{ ...td, color: "#6b7280", whiteSpace: "nowrap" }}>{new Date(l.createdAt).toLocaleString()}</td>
+                  <td style={td}><Badge status={l.topic.charAt(0).toUpperCase() + l.topic.slice(1)} /></td>
+                  <td style={{ ...td, maxWidth: "220px" }}>{l.userMessage}</td>
+                  <td style={{ ...td, color: "#6b7280", maxWidth: "280px", whiteSpace: "pre-wrap", fontSize: "12px" }}>{l.botReply.slice(0, 120)}{l.botReply.length > 120 ? "…" : ""}</td>
                 </tr>
               ))}
-              {logs.length === 0 && (
-                <tr><td colSpan={4} style={{ padding: "20px", textAlign: "center", color: "#888" }}>No chat logs yet.</td></tr>
-              )}
+              {logs.length === 0 && <tr><td colSpan={4} style={{ padding: "20px", textAlign: "center", color: "#888" }}>No chat logs yet.</td></tr>}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* ── Knowledge Base ── */}
+      {/* Knowledge Base */}
       {tab === "kb" && (
         <div>
           <div className="form-card" style={{ marginBottom: "1.2rem" }}>
             <h3 style={{ marginTop: 0 }}>{kbEditing ? "Edit Entry" : "Add New KB Entry"}</h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
-              {[["topic","Topic (fee/course/eligibility…)"],["question","Question"]].map(([k,p]) => (
+              {[["topic","Topic (plan/recharge/expiry…)"],["question","Question"]].map(([k,p]) => (
                 <div className="field" key={k}>
                   <label style={{ textTransform: "capitalize" }}>{p}</label>
                   <input value={kbForm[k]} onChange={e => setKbForm(f => ({...f, [k]: e.target.value}))} placeholder={p} />
@@ -286,19 +287,17 @@ export default function Admin({ onBack }) {
             <div className="field">
               <label>Answer</label>
               <textarea value={kbForm.answer} onChange={e => setKbForm(f => ({...f, answer: e.target.value}))}
-                placeholder="Full answer shown to student" rows={3}
+                placeholder="Full answer shown to the subscriber" rows={3}
                 style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #d1d5db", resize: "vertical", fontSize: "14px" }} />
             </div>
             <div className="field">
               <label>Keywords (space separated)</label>
-              <input value={kbForm.keywords} onChange={e => setKbForm(f => ({...f, keywords: e.target.value}))} placeholder="fee cost price pay" />
+              <input value={kbForm.keywords} onChange={e => setKbForm(f => ({...f, keywords: e.target.value}))} placeholder="recharge pay renew balance" />
             </div>
             <div style={{ display: "flex", gap: "8px", marginTop: "0.5rem" }}>
-              <button className="btn-primary" onClick={saveKb}>{kbEditing ? "Update Entry" : "Add Entry"}</button>
+              <button className="btn-primary" style={{ width: "auto", padding: "0.6rem 1.5rem" }} onClick={saveKb}>{kbEditing ? "Update Entry" : "Add Entry"}</button>
               {kbEditing && (
-                <button className="btn-secondary" onClick={() => { setKbEditing(false); setKbForm({ id:0,topic:"",question:"",answer:"",keywords:"" }); }}>
-                  Cancel
-                </button>
+                <button className="btn-secondary" style={{ marginTop: 0 }} onClick={() => { setKbEditing(false); setKbForm({ id:0,topic:"",question:"",answer:"",keywords:"" }); }}>Cancel</button>
               )}
             </div>
           </div>
@@ -306,29 +305,21 @@ export default function Admin({ onBack }) {
           <div className="form-card" style={{ overflowX: "auto" }}>
             <h3 style={{ marginTop: 0 }}>Knowledge Base Entries ({kb.length})</h3>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-              <thead>
-                <tr style={{ background: "#f8fafc" }}>
-                  {["Topic","Question","Answer (preview)","Actions"].map(h => (
-                    <th key={h} style={{ padding: "10px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 700, color: "#374151" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
+              <thead><tr style={{ background: "#f8fafc" }}>
+                {["Topic","Question","Answer (preview)","Actions"].map(h => <th key={h} style={th}>{h}</th>)}
+              </tr></thead>
               <tbody>
                 {kb.map(e => (
                   <tr key={e.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    <td style={{ padding: "10px 12px" }}><Badge status={e.topic.charAt(0).toUpperCase() + e.topic.slice(1)} /></td>
-                    <td style={{ padding: "10px 12px", fontWeight: 600 }}>{e.question}</td>
-                    <td style={{ padding: "10px 12px", color: "#6b7280", maxWidth: "260px" }}>{e.answer.slice(0,80)}…</td>
-                    <td style={{ padding: "10px 12px" }}>
+                    <td style={td}><Badge status={e.topic.charAt(0).toUpperCase() + e.topic.slice(1)} /></td>
+                    <td style={{ ...td, fontWeight: 600 }}>{e.question}</td>
+                    <td style={{ ...td, color: "#6b7280", maxWidth: "260px" }}>{e.answer.slice(0,80)}…</td>
+                    <td style={td}>
                       <div style={{ display: "flex", gap: "6px" }}>
                         <button onClick={() => { setKbForm({ id:e.id, topic:e.topic, question:e.question, answer:e.answer, keywords:e.keywords }); setKbEditing(true); }}
-                          style={{ background: "#dbeafe", color: "#1d4ed8", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
-                          ✏️ Edit
-                        </button>
+                          style={{ background: "#dbeafe", color: "#1d4ed8", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>✏️ Edit</button>
                         <button onClick={() => deleteKb(e.id)}
-                          style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
-                          🗑️ Delete
-                        </button>
+                          style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>🗑️ Delete</button>
                       </div>
                     </td>
                   </tr>

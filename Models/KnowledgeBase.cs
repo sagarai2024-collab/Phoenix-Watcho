@@ -1,10 +1,10 @@
-namespace StudentLearningPortal.Models;
+namespace PhoenixWatcho.Models;
 
 public class KnowledgeBase
 {
     public int Id { get; set; }
-    public string Topic { get; set; } = "";      // fee, course, eligibility, etc.
-    public string Question { get; set; } = "";   // "What is the registration fee?"
-    public string Answer { get; set; } = "";     // "The fee is ₹900 for all programs."
-    public string Keywords { get; set; } = "";   // "fee cost price pay money charge"
+    public string Topic { get; set; } = "";      // plan, recharge, expiry, hd, ncf, etc.
+    public string Question { get; set; } = "";   // "How do I recharge my DishTV?"
+    public string Answer { get; set; } = "";     // "You can recharge via the Watcho app..."
+    public string Keywords { get; set; } = "";   // "recharge pay renew balance top up"
 }

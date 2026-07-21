@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using StudentLearningPortal.Data;
+using PhoenixWatcho.Data;
 
 #nullable disable
 
-namespace StudentLearningPortal.Migrations
+namespace PhoenixWatcho.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     partial class AppDbContextModelSnapshot : ModelSnapshot
@@ -22,7 +22,7 @@ namespace StudentLearningPortal.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("StudentLearningPortal.Models.ChatLog", b =>
+            modelBuilder.Entity("PhoenixWatcho.Models.ChatLog", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -50,7 +50,7 @@ namespace StudentLearningPortal.Migrations
                     b.ToTable("ChatLogs");
                 });
 
-            modelBuilder.Entity("StudentLearningPortal.Models.KnowledgeBase", b =>
+            modelBuilder.Entity("PhoenixWatcho.Models.KnowledgeBase", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -77,154 +77,9 @@ namespace StudentLearningPortal.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("KnowledgeBase");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Answer = "The registration fee is ₹900 for all programs — B.Tech, BCA, BBA, and MBA.",
-                            Keywords = "fee cost price pay amount money charge registration",
-                            Question = "What is the registration fee?",
-                            Topic = "fee"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Answer = "Greenland University offers: B.Tech (CS, ECE, ME), BCA, BBA, and MBA.",
-                            Keywords = "course program subject offer available study options",
-                            Question = "What courses are available?",
-                            Topic = "course"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Answer = "B.Tech requires minimum 60% in 12th grade with PCM subjects.",
-                            Keywords = "eligibility btech engineering qualify marks percentage criteria 12th pcm",
-                            Question = "What is the eligibility for B.Tech?",
-                            Topic = "eligibility"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Answer = "MBA requires a graduation degree in any stream. Minimum 50% in graduation.",
-                            Keywords = "eligibility mba qualify graduation degree criteria masters",
-                            Question = "What is the eligibility for MBA?",
-                            Topic = "eligibility"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Answer = "BCA requires minimum 55% in 12th grade with Mathematics.",
-                            Keywords = "eligibility bca qualify marks percentage criteria 12th math",
-                            Question = "What is the eligibility for BCA?",
-                            Topic = "eligibility"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Answer = "BBA requires minimum 50% in 12th grade in any stream.",
-                            Keywords = "eligibility bba qualify marks percentage criteria 12th",
-                            Question = "What is the eligibility for BBA?",
-                            Topic = "eligibility"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Answer = "The registration deadline is June 30, 2025. Apply soon to secure your seat!",
-                            Keywords = "deadline last date expire close when registration date time",
-                            Question = "What is the registration deadline?",
-                            Topic = "deadline"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Answer = "B.Tech: 4 years | MBA: 2 years | BCA: 3 years | BBA: 3 years.",
-                            Keywords = "duration year long semester how many years time period",
-                            Question = "What is the course duration?",
-                            Topic = "duration"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Answer = "Required documents: 1) 10th marksheet 2) 12th marksheet 3) Passport photo 4) Aadhaar card.",
-                            Keywords = "document upload certificate paper required needed submit",
-                            Question = "What documents are required?",
-                            Topic = "document"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Answer = "Email: admissions@greenlanduniversity.edu | Office hours: Mon-Fri, 9 AM to 5 PM.",
-                            Keywords = "contact support helpdesk email office phone address reach",
-                            Question = "How to contact the university?",
-                            Topic = "contact"
-                        },
-                        new
-                        {
-                            Id = 11,
-                            Answer = "Click the Register tab, fill in your name, email, course, password and other details. Pay ₹900 fee online.",
-                            Keywords = "register signup enroll admission apply join how to create account",
-                            Question = "How to register?",
-                            Topic = "register"
-                        },
-                        new
-                        {
-                            Id = 12,
-                            Answer = "Click the Login tab and enter your registered email and password to sign in.",
-                            Keywords = "login signin password forgot account access",
-                            Question = "How to login?",
-                            Topic = "login"
-                        });
                 });
 
-            modelBuilder.Entity("StudentLearningPortal.Models.Student", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Address")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Course")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("DateOfBirth")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Gender")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Password")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Phone")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("RegisteredAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email")
-                        .IsUnique();
-
-                    b.ToTable("Students");
-                });
-
-            modelBuilder.Entity("StudentLearningPortal.Models.StudentDocument", b =>
+            modelBuilder.Entity("PhoenixWatcho.Models.KycDocument", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -248,7 +103,7 @@ namespace StudentLearningPortal.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("StudentId")
+                    b.Property<int>("SubscriberId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("UploadedAt")
@@ -256,20 +111,172 @@ namespace StudentLearningPortal.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("StudentId");
+                    b.HasIndex("SubscriberId");
 
-                    b.ToTable("StudentDocuments");
+                    b.ToTable("KycDocuments");
                 });
 
-            modelBuilder.Entity("StudentLearningPortal.Models.StudentDocument", b =>
+            modelBuilder.Entity("PhoenixWatcho.Models.Plan", b =>
                 {
-                    b.HasOne("StudentLearningPortal.Models.Student", "Student")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChannelCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<bool>("IsHd")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("MonthlyPrice")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Tier")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ValidityDays")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Plans");
+                });
+
+            modelBuilder.Entity("PhoenixWatcho.Models.Subscriber", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("City")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Password")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("State")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("StbNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("VcNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VcNumber")
+                        .IsUnique();
+
+                    b.ToTable("Subscribers");
+                });
+
+            modelBuilder.Entity("PhoenixWatcho.Models.Subscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("PlanId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SubscriberId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlanId");
+
+                    b.HasIndex("SubscriberId");
+
+                    b.ToTable("Subscriptions");
+                });
+
+            modelBuilder.Entity("PhoenixWatcho.Models.KycDocument", b =>
+                {
+                    b.HasOne("PhoenixWatcho.Models.Subscriber", "Subscriber")
                         .WithMany()
-                        .HasForeignKey("StudentId")
+                        .HasForeignKey("SubscriberId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Student");
+                    b.Navigation("Subscriber");
+                });
+
+            modelBuilder.Entity("PhoenixWatcho.Models.Subscription", b =>
+                {
+                    b.HasOne("PhoenixWatcho.Models.Plan", "Plan")
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhoenixWatcho.Models.Subscriber", "Subscriber")
+                        .WithMany("Subscriptions")
+                        .HasForeignKey("SubscriberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Plan");
+
+                    b.Navigation("Subscriber");
+                });
+
+            modelBuilder.Entity("PhoenixWatcho.Models.Subscriber", b =>
+                {
+                    b.Navigation("Subscriptions");
                 });
 #pragma warning restore 612, 618
         }

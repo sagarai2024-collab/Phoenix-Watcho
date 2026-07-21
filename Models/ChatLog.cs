@@ -1,4 +1,4 @@
-namespace StudentLearningPortal.Models;
+namespace PhoenixWatcho.Models;
 
 public class ChatLog
 {

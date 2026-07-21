@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 export default function ChatAssistant() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: "assistant", content: "Hi! I'm the Greenland University assistant. Ask me about registration, courses, or eligibility." },
+    { role: "assistant", content: "Hi! I'm the DishTV / Watcho assistant. Ask me about plans, recharge, expiry or charges — or type your VC number to check your plan." },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,7 +49,7 @@ export default function ChatAssistant() {
       {open && (
         <div className="chat-box">
           <div className="chat-header">
-            <span>University Assistant</span>
+            <span>DishTV Assistant</span>
             <button onClick={() => setOpen(false)} className="chat-close">✕</button>
           </div>
           <div className="chat-messages">
@@ -62,7 +62,7 @@ export default function ChatAssistant() {
           <div className="chat-input-row">
             <input value={input} onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && send()}
-              placeholder="Ask about courses, fees..." disabled={loading} />
+              placeholder="Ask about plans, recharge, expiry..." disabled={loading} />
             <button onClick={send} disabled={loading || !input.trim()} className="btn-send">Send</button>
           </div>
         </div>

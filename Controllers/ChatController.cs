@@ -9,25 +9,23 @@ namespace PhoenixWatcho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ChatController(IConfiguration config, AppDbContext db, Kernel kernel,
+public class ChatController(AppDbContext db, Kernel kernel,
                             RagService rag, EmbeddingService embedder,
                             SupabaseVectorService supabase) : ControllerBase
 {
     [HttpGet("diagnose")]
     public IActionResult Diagnose()
     {
-        var key = config["OpenAI:Key"] ?? "(missing)";
         var skEnabled = kernel.Services.GetService<IChatCompletionService>() != null;
         return Ok(new
         {
-            hasChatKey       = key.StartsWith("sk-") && key.Length > 20,
-            chatModel        = config["OpenAI:Model"] ?? "(missing)",
-            skEnabled,
-            embeddingsReady  = embedder.IsConfigured,
-            embeddingModel   = config["OpenAI:EmbeddingModel"] ?? "(missing)",
-            supabaseReady    = supabase.IsConfigured,
-            retrievalMode    = embedder.IsConfigured && supabase.IsConfigured
-                                 ? "Supabase pgvector (real embeddings)"
+            llmEnabled        = skEnabled,
+            embeddingProvider = embedder.Provider,          // Gemini / OpenAI / None
+            embeddingDims     = embedder.Dimensions,        // 768 (Gemini) or 1536 (OpenAI)
+            embeddingsReady   = embedder.IsConfigured,
+            supabaseReady     = supabase.IsConfigured,
+            retrievalMode     = embedder.IsConfigured && supabase.IsConfigured
+                                 ? $"Supabase pgvector ({embedder.Provider} embeddings)"
                                  : "Local cosine similarity (fallback)"
         });
     }

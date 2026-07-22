@@ -16,6 +16,12 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.30.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.Google" Version="1.30.0-alpha" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Google/Gemini connector is a preview (experimental) Semantic Kernel feature -->
+    <NoWarn>$(NoWarn);SKEXP0070</NoWarn>
+  </PropertyGroup>
 
 </Project>

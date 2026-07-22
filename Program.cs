@@ -26,12 +26,23 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Register Semantic Kernel — chat completion added only when a real key is present
+// Register Semantic Kernel — chat completion added only when a real key is present.
+// Prefer Google Gemini (free tier) when configured, else OpenAI.
 var kernelBuilder = Kernel.CreateBuilder();
+var geminiKey = builder.Configuration["Gemini:Key"] ?? "";
 var openAIKey = builder.Configuration["OpenAI:Key"] ?? "";
-if (openAIKey.StartsWith("sk-") && openAIKey.Length > 20)
+if (geminiKey.StartsWith("AIza"))
+{
+#pragma warning disable SKEXP0070 // Gemini connector is experimental
+    kernelBuilder.AddGoogleAIGeminiChatCompletion(
+        builder.Configuration["Gemini:Model"] ?? "gemini-2.0-flash", geminiKey);
+#pragma warning restore SKEXP0070
+}
+else if (openAIKey.StartsWith("sk-") && openAIKey.Length > 20)
+{
     kernelBuilder.AddOpenAIChatCompletion(
         builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini", openAIKey);
+}
 builder.Services.AddSingleton(kernelBuilder.Build());
 
 var app = builder.Build();

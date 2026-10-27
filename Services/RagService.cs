@@ -34,14 +34,24 @@ public class RagService(
     private const double LiveThreshold  = 0.75; // cosine similarity on real embeddings
     private const double LocalThreshold = 0.15; // cosine similarity on bag-of-words vectors
 
-    public async Task<RagResult> AnswerAsync(string message, List<ChatHistory>? history)
+    public async Task<RagResult> AnswerAsync(string message, List<ChatHistory>? history, string? signedInVc = null)
     {
         var msg   = (message ?? "").Trim();
         var lower = msg.ToLower();
 
         // 1. VC-number lookup (account-grounded answer) — never hits the LLM.
         var vc = Regex.Match(msg, @"\b0\d{10}\b");
-        if (vc.Success) return await VcLookupAsync(vc.Value);
+        //    Only answered for the VC the caller is signed in with, so the chat cannot be
+        //    used to look up other subscribers' names and plans.
+        if (vc.Success)
+        {
+            return vc.Value == signedInVc
+                ? await VcLookupAsync(vc.Value)
+                : new RagResult(
+                    "For your privacy I can only show account details for the VC number you are signed in with. " +
+                    "Please log in, then ask again.",
+                    true, new List<string> { "account" }, Suggestions());
+        }
 
         // 2. Intent fast-paths (greetings/thanks/bye) — never hit the LLM.
         var quick = QuickIntent(lower);

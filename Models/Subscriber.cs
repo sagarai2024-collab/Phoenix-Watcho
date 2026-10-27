@@ -10,7 +10,7 @@ public class Subscriber
     public string VcNumber { get; set; } = "";   // Viewing Card number — unique login id (e.g. 01234567890)
     public string FullName { get; set; } = "";
     public string Email { get; set; } = "";
-    public string Password { get; set; } = "";    // SHA256 hashed
+    public string Password { get; set; } = "";    // ASP.NET Core Identity PasswordHasher (PBKDF2)
     public string? Phone { get; set; }            // RMN — Registered Mobile Number
     public string? StbNumber { get; set; }        // Set-Top Box serial number
     public string? Address { get; set; }

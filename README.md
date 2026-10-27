@@ -1,8 +1,12 @@
-# Phoenix-Watcho — DishTV Consumer Self-Care Portal
+# Phoenix-Watcho
 
-A full-stack **DishTV / Watcho consumer portal** with an AI support chatbot, built on **React.js 18** + **ASP.NET Core 9 Web API** + **SQL Server**, with **Microsoft Semantic Kernel** for the RAG chatbot.
+A DTH subscriber self-care portal with a RAG support assistant. Subscribers sign in with their 11-digit Viewing Card number to see their plan, days to expiry and an itemized bill, and ask the assistant questions answered from a knowledge base stored in Supabase pgvector.
 
-Subscribers log in with their **VC (Viewing Card) number**, see their **current plan and expiry**, get **renewal notifications**, and view an **itemized bill** (base pack + NCF + HD add-on + GST − discount).
+Built with React 19 (Vite), ASP.NET Core 9 Web API, EF Core 9 on SQL Server and Microsoft Semantic Kernel. Embeddings sit in Supabase pgvector behind an HNSW index and are searched by cosine similarity through a `match_documents` SQL function. The assistant uses Google Gemini when a Gemini key is set, OpenAI otherwise, and returns the best knowledge-base answer directly when neither is configured.
+
+It is a portfolio build modelled on a consumer portal I worked on in the OTT/DTH industry. Plans, prices and subscribers are seeded demo data.
+
+**Status.** Portal (plans, expiry, billing, KYC, admin): working. Assistant: retrieval and generation working. Admin API protected by role-based cookie auth. Account lookup in chat answers only for the signed-in subscriber.
 
 ## Features
 
@@ -27,7 +31,7 @@ Subscribers log in with their **VC (Viewing Card) number**, see their **current 
 
 | Layer | Technology |
 |---|---|
-| Frontend | React.js 18, Vite |
+| Frontend | React 19, Vite |
 | Backend | ASP.NET Core 9 Web API, C# |
 | AI | Microsoft Semantic Kernel, Azure OpenAI (GPT-4o-mini) |
 | Database | SQL Server, EF Core 9 Code First + Migrations |
@@ -58,7 +62,7 @@ Open `http://localhost:5173` (dev) — the chatbot is the 💬 button at the bot
 | `01234500001` | `Pass123` | Expiring (3 days left) |
 | `01234500002` | `Pass123` | Expired (recharge banner) |
 
-Admin panel password: `admin123`.
+Admin panel password: `admin123`, checked on the server and set in `appsettings.json` under `Admin:Password`. Change it before deploying anywhere.
 
 To enable AI-generated chatbot responses, add your OpenAI key in `appsettings.json`:
 ```json
@@ -69,11 +73,11 @@ Without a key the chatbot still works — it returns grounded knowledge-base ans
 ## Architecture
 
 ```
-React.js 18 (Vite)
+React 19 (Vite)
       │  fetch /api/*
 ASP.NET Core 9 Web API
       │
-      ├── SubscriberController → VC-number register / login (SHA256)
+      ├── SubscriberController → VC-number register / login (PasswordHasher, cookie auth)
       ├── PlanController        → plans, expiry status, itemized billing
       ├── DocumentController    → KYC upload + validation
       ├── AdminController       → subscribers, plans, KYC, analytics, KB CRUD

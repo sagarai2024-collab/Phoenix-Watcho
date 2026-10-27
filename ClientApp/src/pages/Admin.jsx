@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 
-const ADMIN_PASSWORD = "admin123";
 const rupee = (n) => "₹" + Number(n).toLocaleString("en-IN");
 
 const STATUS_BADGE = {
@@ -47,15 +46,31 @@ export default function Admin({ onBack }) {
       const entry = map[section];
       if (!entry) return;
       const r = await fetch(entry[0]);
+      if (r.status === 401 || r.status === 403) { setAuthed(false); return; }
       entry[1](await r.json());
     } catch { /* ignore */ }
   }, []);
 
   useEffect(() => { if (authed) load(tab); }, [authed, tab, load]);
 
-  const handleLogin = () => {
-    if (pwd === ADMIN_PASSWORD) { setAuthed(true); setPwdErr(""); }
-    else setPwdErr("Wrong password.");
+  // Reuse an existing admin session (the cookie survives a page refresh).
+  useEffect(() => {
+    fetch("/api/admin/me").then(r => { if (r.ok) setAuthed(true); }).catch(() => {});
+  }, []);
+
+  // The password is checked on the server, which then sets an HttpOnly auth cookie.
+  const handleLogin = async () => {
+    try {
+      const r = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pwd }),
+      });
+      if (r.ok) { setAuthed(true); setPwdErr(""); setPwd(""); }
+      else setPwdErr("Wrong password.");
+    } catch {
+      setPwdErr("Could not reach the server.");
+    }
   };
 
   const updateDocStatus = async (id, status) => {
@@ -102,7 +117,7 @@ export default function Admin({ onBack }) {
         <p className="switch-link" style={{ marginTop: "1rem" }}>
           <button onClick={onBack}>← Back to Portal</button>
         </p>
-        <p style={{ fontSize: "12px", color: "#a0aec0", marginTop: "0.5rem" }}>Demo password: <strong>admin123</strong></p>
+        <p style={{ fontSize: "12px", color: "#a0aec0", marginTop: "0.5rem" }}>Demo password: <strong>admin123</strong> (set in appsettings.json, Admin:Password)</p>
       </div>
     );
   }
@@ -120,7 +135,8 @@ export default function Admin({ onBack }) {
     <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 1rem", width: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
         <h2 style={{ margin: 0 }}>Admin Panel</h2>
-        <button className="btn-secondary" style={{ marginTop: 0 }} onClick={onBack}>← Back to Portal</button>
+        <button className="btn-secondary" style={{ marginTop: 0 }}
+          onClick={() => { fetch("/api/admin/logout", { method: "POST" }).catch(() => {}); onBack(); }}>← Back to Portal</button>
       </div>
 
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "1.2rem" }}>

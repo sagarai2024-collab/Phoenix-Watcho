@@ -1,5 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PhoenixWatcho.Models;
 
@@ -12,8 +11,10 @@ namespace PhoenixWatcho.Data;
 /// </summary>
 public static class DbInitializer
 {
-    private static string Hash(string password) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(password))).ToLower();
+    private static readonly PasswordHasher<Subscriber> Hasher = new();
+
+    // PasswordHasher does not read the user object, so the demo seed passes null.
+    private static string Hash(string password) => Hasher.HashPassword(null!, password);
 
     public static async Task SeedAsync(AppDbContext db)
     {

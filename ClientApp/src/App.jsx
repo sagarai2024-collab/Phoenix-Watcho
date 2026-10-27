@@ -11,7 +11,11 @@ export default function App() {
   const [subscriber, setSubscriber] = useState(null);
 
   const handleLogin  = (data) => { setSubscriber(data); setPage("dashboard"); };
-  const handleLogout = () => { setSubscriber(null); setPage("login"); };
+  const handleLogout = () => {
+    fetch("/api/subscriber/logout", { method: "POST" }).catch(() => {});
+    setSubscriber(null);
+    setPage("login");
+  };
 
   return (
     <div className="app">

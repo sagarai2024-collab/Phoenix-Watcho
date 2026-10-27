@@ -1,21 +1,49 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PhoenixWatcho.Data;
 using PhoenixWatcho.Models;
+using PhoenixWatcho.Services;
 
 namespace PhoenixWatcho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class SubscriberController(AppDbContext db) : ControllerBase
+public class SubscriberController(AppDbContext db, IPasswordHasher<Subscriber> hasher) : ControllerBase
 {
-    private static string HashPassword(string password)
+    /// <summary>
+    /// The unsalted SHA256 format used before PasswordHasher. Kept only so accounts
+    /// created with it can still sign in; they are re-hashed on their next login.
+    /// </summary>
+    private static string LegacySha256(string password) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(password))).ToLower();
+
+    private bool VerifyAndUpgrade(Subscriber subscriber, string password)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-        return Convert.ToHexString(bytes).ToLower();
+        // Legacy unsalted SHA256 hex: verify the old way, then upgrade the stored hash.
+        if (subscriber.Password.Length == 64 && subscriber.Password.All(Uri.IsHexDigit))
+        {
+            var matches = CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(subscriber.Password),
+                Encoding.UTF8.GetBytes(LegacySha256(password)));
+            if (matches)
+                subscriber.Password = hasher.HashPassword(subscriber, password);
+            return matches;
+        }
+
+        var result = hasher.VerifyHashedPassword(subscriber, subscriber.Password, password);
+        if (result == PasswordVerificationResult.SuccessRehashNeeded)
+            subscriber.Password = hasher.HashPassword(subscriber, password);
+        return result != PasswordVerificationResult.Failed;
     }
+
+    private Task SignInAsync(Subscriber subscriber) =>
+        HttpContext.SignInAsync(AuthExtensions.ForSubscriber(subscriber),
+                                new AuthenticationProperties { IsPersistent = true });
 
     /// <summary>Generate a unique 11-digit VC (Viewing Card) number.</summary>
     private async Task<string> GenerateVcNumberAsync()
@@ -30,6 +58,7 @@ public class SubscriberController(AppDbContext db) : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = AuthExtensions.AdminRole)]
     public async Task<IActionResult> GetAll() =>
         Ok(await db.Subscribers
             .AsNoTracking()
@@ -62,7 +91,7 @@ public class SubscriberController(AppDbContext db) : ControllerBase
             VcNumber     = await GenerateVcNumberAsync(),
             FullName     = req.FullName,
             Email        = req.Email,
-            Password     = HashPassword(req.Password),
+            Password     = "",
             Phone        = req.Phone,
             Address      = req.Address,
             City         = req.City,
@@ -71,8 +100,13 @@ public class SubscriberController(AppDbContext db) : ControllerBase
             RegisteredAt = DateTime.UtcNow
         };
 
+        subscriber.Password = hasher.HashPassword(subscriber, req.Password);
+
         db.Subscribers.Add(subscriber);
         await db.SaveChangesAsync();
+
+        // Signed in straight away so the KYC upload step that follows is authorised.
+        await SignInAsync(subscriber);
 
         return Ok(new
         {
@@ -88,12 +122,14 @@ public class SubscriberController(AppDbContext db) : ControllerBase
         if (string.IsNullOrWhiteSpace(req.VcNumber) || string.IsNullOrWhiteSpace(req.Password))
             return BadRequest("VC number and password are required.");
 
-        var hashed = HashPassword(req.Password);
         var subscriber = await db.Subscribers
-            .FirstOrDefaultAsync(s => s.VcNumber == req.VcNumber.Trim() && s.Password == hashed);
+            .FirstOrDefaultAsync(s => s.VcNumber == req.VcNumber.Trim());
 
-        if (subscriber is null)
+        if (subscriber is null || !VerifyAndUpgrade(subscriber, req.Password))
             return Unauthorized("Invalid VC number or password.");
+
+        await db.SaveChangesAsync(); // persists a re-hashed password, if any
+        await SignInAsync(subscriber);
 
         return Ok(new
         {
@@ -107,6 +143,13 @@ public class SubscriberController(AppDbContext db) : ControllerBase
             state     = subscriber.State,
             stbNumber = subscriber.StbNumber
         });
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        await HttpContext.SignOutAsync();
+        return Ok();
     }
 }
 

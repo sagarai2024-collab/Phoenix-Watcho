@@ -36,7 +36,8 @@ public class ChatController(AppDbContext db, Kernel kernel,
         if (string.IsNullOrWhiteSpace(request.Message))
             return BadRequest("Message is required.");
 
-        var result = await rag.AnswerAsync(request.Message, request.History);
+        // Only the signed-in subscriber's own VC can be looked up in chat.
+        var result = await rag.AnswerAsync(request.Message, request.History, User.VcNumber());
 
         // Chat analytics — log every conversation.
         db.ChatLogs.Add(new ChatLog

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PhoenixWatcho.Data;
@@ -23,9 +24,13 @@ public class PlanController(AppDbContext db, BillingService billing) : Controlle
     /// plus the full catalogue of available plans to upgrade to.
     /// This is what the consumer dashboard reads.
     /// </summary>
+    [Authorize]
     [HttpGet("subscriber/{vcNumber}")]
     public async Task<IActionResult> GetForSubscriber(string vcNumber)
     {
+        if (!User.CanAccessVc(vcNumber))
+            return Forbid();
+
         var subscriber = await db.Subscribers
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.VcNumber == vcNumber);
@@ -68,9 +73,13 @@ public class PlanController(AppDbContext db, BillingService billing) : Controlle
     }
 
     /// <summary>Subscribe / upgrade a VC to a plan. Creates a fresh validity window.</summary>
+    [Authorize]
     [HttpPost("subscribe")]
     public async Task<IActionResult> Subscribe([FromBody] SubscribeRequest req)
     {
+        if (!User.CanAccessVc(req.VcNumber))
+            return Forbid();
+
         var subscriber = await db.Subscribers.FirstOrDefaultAsync(s => s.VcNumber == req.VcNumber);
         if (subscriber is null) return NotFound("Subscriber not found.");
 

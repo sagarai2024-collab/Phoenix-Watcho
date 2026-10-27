@@ -1,12 +1,15 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PhoenixWatcho.Data;
 using PhoenixWatcho.Models;
+using PhoenixWatcho.Services;
 
 namespace PhoenixWatcho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class DocumentController(AppDbContext db, IWebHostEnvironment env) : ControllerBase
 {
     private static readonly string[] AllowedTypes = [".jpg", ".jpeg", ".png", ".pdf"];
@@ -17,6 +20,9 @@ public class DocumentController(AppDbContext db, IWebHostEnvironment env) : Cont
                                             [FromForm] string documentType,
                                             IFormFile file)
     {
+        if (!User.CanAccessSubscriber(subscriberId))
+            return Forbid();
+
         if (file == null || file.Length == 0)
             return BadRequest("No file uploaded.");
 
@@ -58,6 +64,9 @@ public class DocumentController(AppDbContext db, IWebHostEnvironment env) : Cont
     [HttpGet("{subscriberId}")]
     public async Task<IActionResult> GetDocuments(int subscriberId)
     {
+        if (!User.CanAccessSubscriber(subscriberId))
+            return Forbid();
+
         var docs = await db.KycDocuments
             .Where(d => d.SubscriberId == subscriberId)
             .Select(d => new { d.Id, d.DocumentType, d.FileName, d.FilePath, d.UploadedAt, d.Status })

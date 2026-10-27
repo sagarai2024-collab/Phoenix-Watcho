@@ -1,3 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -9,8 +13,41 @@ namespace PhoenixWatcho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBase
+[Authorize(Roles = AuthExtensions.AdminRole)]
+public class AdminController(AppDbContext db, IMemoryCache cache, IConfiguration config) : ControllerBase
 {
+    // ── Sign-in ─────────────────────────────────────────────────────────────
+
+    /// <summary>Checks the password against Admin:Password in configuration.</summary>
+    [AllowAnonymous]
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] AdminLoginRequest req)
+    {
+        var expected = config["Admin:Password"];
+        if (string.IsNullOrEmpty(expected))
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Admin password is not configured.");
+
+        var ok = CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(req.Password ?? ""),
+            Encoding.UTF8.GetBytes(expected));
+        if (!ok)
+            return Unauthorized("Wrong password.");
+
+        await HttpContext.SignInAsync(AuthExtensions.ForAdmin());
+        return Ok();
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        await HttpContext.SignOutAsync();
+        return Ok();
+    }
+
+    /// <summary>200 when the caller has an admin session; the UI uses it to skip the login form.</summary>
+    [HttpGet("me")]
+    public IActionResult Me() => Ok();
+
     // ── Subscribers ─────────────────────────────────────────────────────────
 
     [HttpGet("subscribers")]
@@ -192,3 +229,4 @@ public class AdminController(AppDbContext db, IMemoryCache cache) : ControllerBa
 }
 
 public record UpdateStatusRequest(string Status);
+public record AdminLoginRequest(string? Password);
